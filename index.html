@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SSH 免密登录工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0f14;
+    --surface: #13171f;
+    --surface2: #1a1f2a;
+    --surface3: #222835;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --accent: #4ade80;
+    --accent2: #22d3ee;
+    --accent3: #f59e0b;
+    --text: #e8eaf0;
+    --text2: #8b91a0;
+    --text3: #50566a;
+    --red: #f87171;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(74,222,128,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(74,222,128,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Header ── */
+  header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--accent); background: rgba(74,222,128,0.08);
+    border: 1px solid rgba(74,222,128,0.2);
+    padding: 4px 12px; border-radius: 999px;
+    margin-bottom: 20px;
+  }
+
+  .header-tag::before {
+    content: '';
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    animation: blink 1.4s ease-in-out infinite;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--text2);
+    line-height: 1.7;
+  }
+
+  /* ── Main layout ── */
+  main { padding: 40px 0 80px; display: grid; gap: 32px; }
+
+  /* ── Panel ── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text2);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .panel-header .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(74,222,128,0.5);
+  }
+
+  .panel-body { padding: 24px; }
+
+  /* ── Form ── */
+  .fields { display: grid; gap: 20px; }
+  .row2 { grid-template-columns: 1fr 1fr; display: grid; gap: 16px; }
+
+  @media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
+
+  .field { display: flex; flex-direction: column; gap: 8px; }
+
+  label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+  }
+
+  label span { color: var(--accent); margin-left: 2px; }
+
+  input, select {
+    background: var(--surface3);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+    appearance: none;
+  }
+
+  input::placeholder { color: var(--text3); }
+
+  input:focus, select:focus {
+    border-color: rgba(74,222,128,0.4);
+    box-shadow: 0 0 0 3px rgba(74,222,128,0.08);
+  }
+
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2350566a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+
+  .tab {
+    padding: 7px 16px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text2);
+    transition: all 0.15s;
+  }
+
+  .tab:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+  .tab.active {
+    background: rgba(74,222,128,0.1);
+    border-color: rgba(74,222,128,0.35);
+    color: var(--accent);
+  }
+
+  /* ── Steps ── */
+  .steps { display: grid; gap: 16px; }
+
+  .step { display: grid; grid-template-columns: 28px 1fr; gap: 14px; align-items: start; }
+
+  .step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: rgba(74,222,128,0.1);
+    border: 1px solid rgba(74,222,128,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .step-content {}
+
+  .step-label {
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 6px;
+    letter-spacing: 0.03em;
+  }
+
+  /* ── Code block ── */
+  .code-block {
+    position: relative;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 44px 12px 16px;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #a8e6c1;
+    min-height: 44px;
+  }
+
+  .code-block .prompt {
+    color: var(--text3);
+    user-select: none;
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text2);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+  }
+
+  .copy-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.25); }
+  .copy-btn.ok { color: var(--accent); border-color: rgba(74,222,128,0.35); }
+
+  /* ── Info box ── */
+  .info-box {
+    background: rgba(34,211,238,0.05);
+    border: 1px solid rgba(34,211,238,0.15);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: rgba(34,211,238,0.7);
+    line-height: 1.7;
+    margin-top: 16px;
+  }
+
+  .info-box strong { color: var(--accent2); font-weight: 500; }
+
+  /* ── Warning box ── */
+  .warn-box {
+    background: rgba(245,158,11,0.05);
+    border: 1px solid rgba(245,158,11,0.15);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: rgba(245,158,11,0.7);
+    line-height: 1.7;
+    margin-top: 16px;
+  }
+
+  .warn-box strong { color: var(--accent3); }
+
+  /* ── Reference panel ── */
+  .ref-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 12px; }
+
+  .ref-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+
+  .ref-card-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .ref-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .ref-item:last-child { border-bottom: none; }
+  .ref-item .key { color: var(--text2); }
+  .ref-item .val { color: var(--accent); font-weight: 500; }
+  .ref-item .val.warn { color: var(--accent3); }
+  .ref-item .val.red { color: var(--red); }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 0 32px;
+    font-size: 11px;
+    color: var(--text3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* ── Animate in ── */
+  .panel { animation: fadeUp 0.4s ease both; }
+  .panel:nth-child(2) { animation-delay: 0.08s; }
+  .panel:nth-child(3) { animation-delay: 0.16s; }
+  .panel:nth-child(4) { animation-delay: 0.24s; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="header-tag">SSH Keygen Tool</div>
+    <h1>SSH <span>免密登录</span><br/>命令生成器</h1>
+    <p class="subtitle">填入服务器信息，自动生成对应平台的完整命令。无需记忆语法，一键复制执行。</p>
+  </header>
+
+  <main>
+
+    <!-- Config Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="dot"></div>
+        配置参数
+      </div>
+      <div class="panel-body">
+        <div class="fields">
+          <div class="field">
+            <label>VPS 地址 <span>*</span></label>
+            <input id="vps" type="text" placeholder="192.168.1.100  或  myserver.com" oninput="gen()" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>登录用户名</label>
+              <input id="user" type="text" value="root" oninput="gen()" spellcheck="false" />
+            </div>
+            <div class="field">
+              <label>SSH 端口</label>
+              <input id="port" type="text" value="22" oninput="gen()" spellcheck="false" />
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>密钥类型</label>
+              <select id="keytype" onchange="gen()">
+                <option value="ed25519">ed25519（推荐）</option>
+                <option value="rsa -b 4096">rsa 4096</option>
+                <option value="ecdsa -b 521">ecdsa 521</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>备注（邮箱 / 描述）</label>
+              <input id="comment" type="text" placeholder="your@email.com" oninput="gen()" spellcheck="false" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Commands Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="dot"></div>
+        生成命令
+      </div>
+      <div class="panel-body">
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('win',this)">Windows (PowerShell)</button>
+          <button class="tab" onclick="switchTab('mac',this)">macOS / Linux</button>
+          <button class="tab" onclick="switchTab('phone',this)">手机 (Termius)</button>
+        </div>
+
+        <!-- Windows -->
+        <div id="tab-win" class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-label">在本机生成密钥对（PowerShell 执行）</div>
+              <div class="code-block"><span class="prompt">PS> </span><span id="w1"></span><button class="copy-btn" onclick="copyEl('w1',this)">复制</button></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-label">上传公钥到服务器（需输入一次密码）</div>
+              <div class="code-block"><span class="prompt">PS> </span><span id="w2"></span><button class="copy-btn" onclick="copyEl('w2',this)">复制</button></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-label">测试免密登录（新开终端执行）</div>
+              <div class="code-block"><span class="prompt">PS> </span><span id="w3"></span><button class="copy-btn" onclick="copyEl('w3',this)">复制</button></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mac/Linux -->
+        <div id="tab-mac" class="steps" style="display:none">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-label">生成密钥对</div>
+              <div class="code-block"><span class="prompt">$ </span><span id="m1"></span><button class="copy-btn" onclick="copyEl('m1',this)">复制</button></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-label">一键上传公钥（ssh-copy-id）</div>
+              <div class="code-block"><span class="prompt">$ </span><span id="m2"></span><button class="copy-btn" onclick="copyEl('m2',this)">复制</button></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-label">测试免密登录</div>
+              <div class="code-block"><span class="prompt">$ </span><span id="m3"></span><button class="copy-btn" onclick="copyEl('m3',this)">复制</button></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phone -->
+        <div id="tab-phone" style="display:none">
+          <div class="steps">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div class="step-content">
+                <div class="step-label">在 Termius 中生成密钥：Keychain → + → Generate Key → ED25519</div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div class="step-content">
+                <div class="step-label">复制公钥，SSH 登录服务器后粘贴到 authorized_keys</div>
+                <div class="code-block"><span class="prompt">$ </span><span id="p2"></span><button class="copy-btn" onclick="copyEl('p2',this)">复制</button></div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div class="step-content">
+                <div class="step-label">在 Termius Host 配置中选择该 Key，之后连接免密</div>
+              </div>
+            </div>
+          </div>
+          <div class="info-box">
+            <strong>推荐 App：</strong>Termius（iOS/Android 均有）。免费版包含 Keychain 密钥管理功能，是手机端 SSH 最佳选择。
+          </div>
+        </div>
+
+        <div class="warn-box">
+          <strong>⚠ 注意：</strong>执行步骤 2 上传公钥时仍需输入一次 VPS 密码。上传成功后即可免密登录。
+          测试成功前<strong>不要关闭当前会话</strong>，否则可能锁定自己。
+        </div>
+      </div>
+    </div>
+
+    <!-- Server side fix -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="dot"></div>
+        服务器端排查（如果登录失败）
+      </div>
+      <div class="panel-body">
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">!</div>
+            <div class="step-content">
+              <div class="step-label">修复目录权限（最常见原因）</div>
+              <div class="code-block"><span class="prompt">$ </span>chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys<button class="copy-btn" onclick="copyText('chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys',this)">复制</button></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">!</div>
+            <div class="step-content">
+              <div class="step-label">确认 sshd 配置已开启公钥认证</div>
+              <div class="code-block"><span class="prompt">$ </span>grep -E "PubkeyAuthentication|AuthorizedKeysFile" /etc/ssh/sshd_config<button class="copy-btn" onclick="copyText('grep -E \"PubkeyAuthentication|AuthorizedKeysFile\" /etc/ssh/sshd_config',this)">复制</button></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">!</div>
+            <div class="step-content">
+              <div class="step-label">查看实时登录日志</div>
+              <div class="code-block"><span class="prompt">$ </span>tail -f /var/log/auth.log   # Debian/Ubuntu
+tail -f /var/log/secure       # CentOS/RHEL<button class="copy-btn" onclick="copyText('tail -f /var/log/auth.log',this)">复制</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reference -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="dot"></div>
+        权限参考 & 密钥对比
+      </div>
+      <div class="panel-body">
+        <div class="ref-grid">
+          <div class="ref-card">
+            <div class="ref-card-title">服务器必须权限</div>
+            <div class="ref-item"><span class="key">~/.ssh/</span><span class="val">700</span></div>
+            <div class="ref-item"><span class="key">authorized_keys</span><span class="val">600</span></div>
+            <div class="ref-item"><span class="key">私钥文件</span><span class="val">600</span></div>
+            <div class="ref-item"><span class="key">公钥文件</span><span class="val warn">644</span></div>
+          </div>
+          <div class="ref-card">
+            <div class="ref-card-title">密钥类型对比</div>
+            <div class="ref-item"><span class="key">ed25519</span><span class="val">推荐，短且快</span></div>
+            <div class="ref-item"><span class="key">rsa 4096</span><span class="val warn">兼容性好</span></div>
+            <div class="ref-item"><span class="key">ecdsa</span><span class="val warn">较新系统</span></div>
+            <div class="ref-item"><span class="key">rsa 1024</span><span class="val red">已不安全</span></div>
+          </div>
+          <div class="ref-card">
+            <div class="ref-card-title">常用 SSH 参数</div>
+            <div class="ref-item"><span class="key">-i</span><span class="val">指定私钥</span></div>
+            <div class="ref-item"><span class="key">-p</span><span class="val">指定端口</span></div>
+            <div class="ref-item"><span class="key">-v</span><span class="val">调试模式</span></div>
+            <div class="ref-item"><span class="key">-N ""</span><span class="val">空 passphrase</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <span>SSH Keygen Tool · 本页所有内容均在本地生成，不上传任何数据</span>
+    <span style="color: var(--accent); opacity:0.6">v1.0</span>
+  </footer>
+
+</div>
+
+<script>
+let currentTab = 'win';
+
+function switchTab(tab, btn) {
+  currentTab = tab;
+  ['win','mac','phone'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function gen() {
+  const vps     = document.getElementById('vps').value.trim()     || 'YOUR_VPS_IP';
+  const user    = document.getElementById('user').value.trim()    || 'root';
+  const port    = document.getElementById('port').value.trim()    || '22';
+  const kt      = document.getElementById('keytype').value;
+  const comment = document.getElementById('comment').value.trim();
+
+  const keyName   = kt.startsWith('ed') ? 'id_ed25519' : kt.startsWith('rsa') ? 'id_rsa' : 'id_ecdsa';
+  const cArg      = comment ? ` -C "${comment}"` : '';
+  const portFlag  = port !== '22' ? ` -p ${port}` : '';
+  const portSCP   = port !== '22' ? ` -P ${port}` : '';
+
+  // Windows
+  document.getElementById('w1').textContent =
+    `ssh-keygen -t ${kt}${cArg}`;
+  document.getElementById('w2').textContent =
+    `type $env:USERPROFILE\\.ssh\\${keyName}.pub | ssh${portFlag} ${user}@${vps} "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"`;
+  document.getElementById('w3').textContent =
+    `ssh${portFlag} -i $env:USERPROFILE\\.ssh\\${keyName} ${user}@${vps}`;
+
+  // Mac/Linux
+  document.getElementById('m1').textContent =
+    `ssh-keygen -t ${kt}${cArg}`;
+  document.getElementById('m2').textContent =
+    `ssh-copy-id${portFlag} -i ~/.ssh/${keyName}.pub ${user}@${vps}`;
+  document.getElementById('m3').textContent =
+    `ssh${portFlag} -i ~/.ssh/${keyName} ${user}@${vps}`;
+
+  // Phone
+  document.getElementById('p2').textContent =
+    `echo "粘贴你的公钥内容" >> ~/.ssh/authorized_keys`;
+}
+
+function copyEl(id, btn) {
+  copyText(document.getElementById(id).textContent, btn);
+}
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '已复制 ✓';
+    btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('ok'); }, 1800);
+  });
+}
+
+gen();
+</script>
+</body>
+</html>
